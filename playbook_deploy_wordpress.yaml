@@ -1,0 +1,88 @@
+---
+- hosts: all
+- beciome: yes
+  handlers:
+    - name: restart apache
+      service:
+        name: apache2
+        state: restarted
+  tasks:
+    - name: Install dependencias
+      apt:
+        pkg:
+        - apache2
+        - ghostscript
+        - mysql-server
+        - libapache2-mod-php 
+        - php 
+        - php-bcmath 
+        - php-curl 
+        - php-imagick 
+        - php-intl 
+        - php-json 
+        - php-mbstring 
+        - php-mysql 
+        - php-xml 
+        - php-zip
+        - python3-pymysql
+        state: latest
+        update_cache: yes
+    - name: Create a directory if it does not exist
+      file:
+        path: /srv/www
+        state: directory
+        owner: www-data
+        group: www-data
+    - name: Unarchive a file that needs to be downloaded (added in 2.0)
+      unarchive:
+        src: https://wordpress.org/latest.tar.gz
+        dest: /srv/www
+        remote_src: yes
+    - name: Copy file with owner and permissions
+      copy:
+        src: files/wordpress.conf
+        dest: /etc/apache2/sites-available/000-default.conf
+      notify:
+        - restart apache
+    - name: crete a new database
+      mysql_db:
+        name: dbpd_wordpress
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock 
+    - name: create a new user with password and grant privileges
+      mysql_user:
+        name: wp_user
+        password: wp_password
+        priv: 'dbpd_wordpress.*:SELECT,INSERT,UPDATE,DELETE, CREATE, DROP, ALTER'
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock
+    - name: copy file with owner and permissions
+      copy:
+        src: /srv/www/wordpress/wp-config-sample.php
+        dest: /srv/www/wordpress/wp-config.php
+        force: no
+        remote_src: yes
+    - name: configure wp-config with database 
+      replace:
+        path: /srv/www/wordpress/wp-config-sample.php
+        regexp: '{{ item.regexp }}'
+        replace: '{{item.replace}}'
+      # Exec loop  
+      with_items:
+      - { regexp: 'database_name_here',replace: 'dbpd_wordpress'}
+      - { regexp: 'username_here',replace: 'wp_user'}
+      - { regexp: 'password_here',replace: 'wp_password'}
+    - name: replace criptografy
+      lineinfile:
+        path: /srv/www/wordpress/wp-config.php
+        search_string: "{{ item.}}"
+        line: "{{ item.}}"
+      with_items:
+      - { search_string: "define( 'AUTH_KEY',         'put your unique phrase here' );",line: "define('AUTH_KEY',         '}oE!O%4QUN5+$+-[=p,xBgzV|6FSm45e)o0-&<K;YF#_|$h8%$w1e8D(b8<;u[gI');"}
+      - { search_string: "define( 'SECURE_AUTH_KEY',  'put your unique phrase here' );",line: "define('SECURE_AUTH_KEY',  '|mZ3 a0ST-F{ [q[&>ob+R8zUGPYqr_@M9K9j1l<kDQC-91@Oifx7|(&P/v6-Fm;');"}
+      - { search_string: "define( 'LOGGED_IN_KEY',    'put your unique phrase here' );",line: "define('LOGGED_IN_KEY',    'f,N![)f+21pYgUdp a|~^JtOZV:j6e g&j12|@k_{]Yus48s?pxP6e$5Y!4unQx,');"}
+      - { search_string: "define( 'NONCE_KEY',        'put your unique phrase here' );",line: "define('NONCE_KEY',        'G$G@Y5+jBPgVCs<Jr5OfdwYf)qMv6_9aW|8;k|<AhyCB(Vnxxv^fxfdv23G-o2V6');"}
+      - { search_string: "define( 'AUTH_SALT',        'put your unique phrase here' );",line: "define('AUTH_SALT',        '>!ULSF2+OvW|<b093wc.w[:p()`wrx.+b+)%FUBN{,[l1?N.9`S$tbE^,vjc,>b ');"}
+      - { search_string: "define( 'SECURE_AUTH_SALT', 'put your unique phrase here' );",line: "define('SECURE_AUTH_SALT', 'p/gI.4(3CM>[4U-u4tI;q|OKU7YD{*?g;k~4M[%bBF-Ph9sb XUz${D{P+B@q0)W');"}
+      - { search_string: "define( 'LOGGED_IN_SALT',   'put your unique phrase here' );",line: "define('LOGGED_IN_SALT',   'E|M/@tG<lT<E+k^ffNZs|@y#114(tC.T3)q8mjRXB^-`z@8F9]+T*1+m)&*K?!s,');"}
+      - { search_string: "define( 'NONCE_SALT',       'put your unique phrase here' );",line: "define('NONCE_SALT',       'B@6V96 >mQq7hu:7Z2RXKQ!FO)[`62?I+@^d6_-/~[.2L@*K?R?e)QT(sZg+d,gi');"}
