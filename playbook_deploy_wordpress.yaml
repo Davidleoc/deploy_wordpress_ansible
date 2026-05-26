@@ -1,5 +1,5 @@
 ---
-- hosts: all
+- hosts: wordpress
 - beciome: yes
   handlers:
     - name: restart apache
@@ -44,18 +44,6 @@
         dest: /etc/apache2/sites-available/000-default.conf
       notify:
         - restart apache
-    - name: crete a new database
-      mysql_db:
-        name: dbpd_wordpress
-        state: present
-        login_unix_socket: /run/mysqld/mysqld.sock 
-    - name: create a new user with password and grant privileges
-      mysql_user:
-        name: wp_user
-        password: wp_password
-        priv: 'dbpd_wordpress.*:SELECT,INSERT,UPDATE,DELETE, CREATE, DROP, ALTER'
-        state: present
-        login_unix_socket: /run/mysqld/mysqld.sock
     - name: copy file with owner and permissions
       copy:
         src: /srv/www/wordpress/wp-config-sample.php
@@ -65,13 +53,14 @@
     - name: configure wp-config with database 
       replace:
         path: /srv/www/wordpress/wp-config-sample.php
-        regexp: '{{ item.regexp }}'
-        replace: '{{item.replace}}'
+        regexp: "{{ item.regexp }}"
+        replace: "{{item.replace}}"
       # Exec loop  
       with_items:
-      - { regexp: 'database_name_here',replace: 'dbpd_wordpress'}
-      - { regexp: 'username_here',replace: 'wp_user'}
-      - { regexp: 'password_here',replace: 'wp_password'}
+      - { regexp: "database_name_here",replace: "dbpd_wordpress"}
+      - { regexp: "username_here",replace: "wp_user"}
+      - { regexp: "password_here",replace: "wp_password"}
+      - { regexp: "localhost",replace: "10.0.100.105"} # IP da maquina do Banco de Dados
     - name: replace criptografy
       lineinfile:
         path: /srv/www/wordpress/wp-config.php
@@ -86,3 +75,43 @@
       - { search_string: "define( 'SECURE_AUTH_SALT', 'put your unique phrase here' );",line: "define('SECURE_AUTH_SALT', 'p/gI.4(3CM>[4U-u4tI;q|OKU7YD{*?g;k~4M[%bBF-Ph9sb XUz${D{P+B@q0)W');"}
       - { search_string: "define( 'LOGGED_IN_SALT',   'put your unique phrase here' );",line: "define('LOGGED_IN_SALT',   'E|M/@tG<lT<E+k^ffNZs|@y#114(tC.T3)q8mjRXB^-`z@8F9]+T*1+m)&*K?!s,');"}
       - { search_string: "define( 'NONCE_SALT',       'put your unique phrase here' );",line: "define('NONCE_SALT',       'B@6V96 >mQq7hu:7Z2RXKQ!FO)[`62?I+@^d6_-/~[.2L@*K?R?e)QT(sZg+d,gi');"}
+
+- hosts: mysql
+  handlers:
+    - name: restart mysql
+      service:
+        name: apache2
+        state: restarted
+  become: yes
+  tasks:
+    - name: Install dependencias in node 2
+      apt:
+        pkg:
+        - mysql-server
+        - python3-pymysql
+        state: latest
+        update_cache: yes
+    - name: crete a new database
+      mysql_db:
+        name: dbpd_wordpress
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock 
+    - name: create a new user with password and grant privileges
+      mysql_user:
+        name: wp_user
+        password: wp_password
+        priv: 'dbpd_wordpress.*:SELECT,INSERT,UPDATE,DELETE, CREATE, DROP, ALTER'
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock
+        host: '{{ item }}'
+      with_items:
+      - 'localhost'
+      - '127.0.0.1'
+      - '10.0.100.106' # IP do servidor do Wordpress
+    - name: configure database to accept external connections
+      replace:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: "127.0.0.1"
+        replace: "0.0.0.0"
+      notify: 
+      - restart mysql
