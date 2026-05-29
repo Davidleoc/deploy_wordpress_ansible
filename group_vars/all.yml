@@ -1,0 +1,5 @@
+---
+wp_db_name: "dbpd_wordpress"
+wp_db_user: "wp_user"
+wp_db_pass: "wp_password"
+
