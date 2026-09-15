@@ -25,5 +25,3 @@ deploy_wordpress_ansible/
 ├── files/              # Arquivos estáticos copiados para os hosts
 ├── playbook.yml        # Playbook principal
 └── README.md
-
->>>>>>> f0c9e704861bb7fd6e257c5f04a3afe18aa9c0e8
